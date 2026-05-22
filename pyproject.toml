@@ -1,0 +1,11 @@
+[project]
+name = "3it-services-beyondcompare"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "diff-match-patch>=20241021",
+    "pyside6>=6.11.0",
+    "xxhash>=3.6.0",
+]
