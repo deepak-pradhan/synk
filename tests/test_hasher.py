@@ -1,111 +1,101 @@
 import tempfile
 import os
-import sys
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+import pytest
 
 from src.core.hasher import Hasher, quick_compare
 
 
-def test_hasher_xxh3_64():
-    hasher = Hasher("xxh3_64")
-    with tempfile.NamedTemporaryFile(mode="w", delete=False) as f:
-        f.write("Hello, World!")
-        fname = f.name
-    try:
-        hash_val = hasher.hash_file(fname)
-        assert isinstance(hash_val, str)
-        assert len(hash_val) == 16  # xxh3_64 is 16 hex chars (64 bits)
-        # Hash the same content again
-        with tempfile.NamedTemporaryFile(mode="w", delete=False) as f2:
-            f2.write("Hello, World!")
-            fname2 = f2.name
-        try:
-            hash_val2 = hasher.hash_file(fname2)
-            assert hash_val == hash_val2
-        finally:
-            os.unlink(fname2)
-        # Different content
-        with tempfile.NamedTemporaryFile(mode="w", delete=False) as f3:
-            f3.write("Hello, Universe!")
-            fname3 = f3.name
-        try:
-            hash_val3 = hasher.hash_file(fname3)
-            assert hash_val != hash_val3
-        finally:
-            os.unlink(fname3)
-    finally:
-        os.unlink(fname)
-
-
-def test_quick_compare_equal():
-    with tempfile.TemporaryDirectory() as tmpdir:
-        file1 = os.path.join(tmpdir, "test1.txt")
-        file2 = os.path.join(tmpdir, "test2.txt")
-        with open(file1, "w") as f:
-            f.write("Hello, World!")
-        with open(file2, "w") as f:
-            f.write("Hello, World!")
+class TestHasher:
+    def test_xxh3_64_same_content(self, tmp_path):
+        file1 = tmp_path / "a.txt"
+        file2 = tmp_path / "b.txt"
+        file1.write_text("Hello, World!")
+        file2.write_text("Hello, World!")
 
         hasher = Hasher("xxh3_64")
-        equal, h1, h2 = quick_compare(file1, file2, hasher)
-        assert equal == True
+        h1 = hasher.hash_file(str(file1))
+        h2 = hasher.hash_file(str(file2))
+        assert isinstance(h1, str)
+        assert len(h1) == 16
+        assert h1 == h2
+
+    def test_xxh3_64_different_content(self, tmp_path):
+        file1 = tmp_path / "a.txt"
+        file2 = tmp_path / "b.txt"
+        file1.write_text("Hello, World!")
+        file2.write_text("Hello, Universe!")
+
+        hasher = Hasher("xxh3_64")
+        h1 = hasher.hash_file(str(file1))
+        h2 = hasher.hash_file(str(file2))
+        assert h1 != h2
+
+    def test_unsupported_algorithm(self):
+        with pytest.raises(ValueError, match="Unsupported hash algorithm"):
+            Hasher("bad_algo")
+
+    @pytest.mark.parametrize("algo", ["xxh3_64", "xxh64", "md5", "sha1", "sha256"])
+    def test_all_algorithms_return_string(self, tmp_path, algo):
+        f = tmp_path / "test.txt"
+        f.write_text("payload")
+        hasher = Hasher(algo)
+        result = hasher.hash_file(str(f))
+        assert isinstance(result, str)
+        assert len(result) > 0
+
+
+class TestQuickCompare:
+    def test_equal_files(self, tmp_path):
+        file1 = tmp_path / "a.txt"
+        file2 = tmp_path / "b.txt"
+        file1.write_text("Hello, World!")
+        file2.write_text("Hello, World!")
+
+        hasher = Hasher("xxh3_64")
+        equal, h1, h2 = quick_compare(str(file1), str(file2), hasher)
+        assert equal is True
         assert h1 is not None and h2 is not None
         assert h1 == h2
 
-
-def test_quick_compare_different_size():
-    with tempfile.TemporaryDirectory() as tmpdir:
-        file1 = os.path.join(tmpdir, "test1.txt")
-        file2 = os.path.join(tmpdir, "test2.txt")
-        with open(file1, "w") as f:
-            f.write("Hello")
-        with open(file2, "w") as f:
-            f.write("Hello, World!")
+    def test_different_size(self, tmp_path):
+        file1 = tmp_path / "a.txt"
+        file2 = tmp_path / "b.txt"
+        file1.write_text("Hello")
+        file2.write_text("Hello, World!")
 
         hasher = Hasher("xxh3_64")
-        equal, h1, h2 = quick_compare(file1, file2, hasher)
-        assert equal == False
-        # Since sizes differ, we still compute hashes (if size>0)
+        equal, h1, h2 = quick_compare(str(file1), str(file2), hasher)
+        assert equal is False
         assert h1 is not None and h2 is not None
         assert h1 != h2
 
-
-def test_quick_compare_same_size_different_content():
-    with tempfile.TemporaryDirectory() as tmpdir:
-        file1 = os.path.join(tmpdir, "test1.txt")
-        file2 = os.path.join(tmpdir, "test2.txt")
-        with open(file1, "w") as f:
-            f.write("Hello")
-        with open(file2, "w") as f:
-            f.write("World!")
+    def test_same_size_different_content(self, tmp_path):
+        file1 = tmp_path / "a.txt"
+        file2 = tmp_path / "b.txt"
+        file1.write_text("Hello")
+        file2.write_text("World!")
 
         hasher = Hasher("xxh3_64")
-        equal, h1, h2 = quick_compare(file1, file2, hasher)
-        assert equal == False
+        equal, h1, h2 = quick_compare(str(file1), str(file2), hasher)
+        assert equal is False
         assert h1 is not None and h2 is not None
         assert h1 != h2
 
-
-def test_quick_compare_empty_files():
-    with tempfile.TemporaryDirectory() as tmpdir:
-        file1 = os.path.join(tmpdir, "empty1.txt")
-        file2 = os.path.join(tmpdir, "empty2.txt")
-        open(file1, "w").close()
-        open(file2, "w").close()
+    def test_empty_files(self, tmp_path):
+        file1 = tmp_path / "empty1.txt"
+        file2 = tmp_path / "empty2.txt"
+        file1.write_text("")
+        file2.write_text("")
 
         hasher = Hasher("xxh3_64")
-        equal, h1, h2 = quick_compare(file1, file2, hasher)
-        assert equal == True
-        # For empty files, hash should be empty string? Actually our hasher will hash empty bytes.
-        # xxh3_64 of empty bytes is a constant.
+        equal, h1, h2 = quick_compare(str(file1), str(file2), hasher)
+        assert equal is True
         assert h1 == h2
 
-
-if __name__ == "__main__":
-    test_hasher_xxh3_64()
-    test_quick_compare_equal()
-    test_quick_compare_different_size()
-    test_quick_compare_same_size_different_content()
-    test_quick_compare_empty_files()
-    print("All tests passed!")
+    def test_nonexistent_file(self, tmp_path):
+        hasher = Hasher("xxh3_64")
+        equal, h1, h2 = quick_compare(str(tmp_path / "nope"), str(tmp_path / "nope2"), hasher)
+        assert equal is False
+        assert h1 is None
+        assert h2 is None

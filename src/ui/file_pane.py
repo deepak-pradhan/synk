@@ -7,21 +7,96 @@ from PySide6.QtWidgets import (
     QPushButton,
     QHBoxLayout,
     QFileDialog,
+    QMenu,
 )
-from PySide6.QtCore import Qt, Signal, Slot, QDir, QFileInfo, QModelIndex
-from PySide6.QtGui import QStandardItemModel, QStandardItem, QBrush, QColor
+from PySide6.QtCore import (
+    Qt,
+    Signal,
+    Slot,
+    QDir,
+    QFileInfo,
+    QModelIndex,
+    QMimeData,
+    QByteArray,
+)
+from PySide6.QtGui import (
+    QStandardItemModel,
+    QStandardItem,
+    QBrush,
+    QColor,
+    QDrag,
+)
 import os
 from pathlib import Path
+
+MIME_TYPE = "application/x-beyondcomp-filepaths"
+
+
+class DropTreeView(QTreeView):
+    """QTreeView subclass that supports drag-out and drop-in of file paths."""
+
+    files_dropped = Signal(list)
+
+    def __init__(self, pane, parent=None):
+        super().__init__(parent)
+        self.pane = pane
+        self.setAcceptDrops(True)
+        self.setDragEnabled(True)
+        self.setDragDropMode(QTreeView.DragDropMode.DragDrop)
+        self.setDefaultDropAction(Qt.DropAction.CopyAction)
+        self.setDropIndicatorShown(True)
+
+    def startDrag(self, supportedActions):
+        selected = self.selectionModel().selectedRows(0)
+        if not selected:
+            return
+        paths = []
+        for idx in selected:
+            item = self.model().itemFromIndex(idx)
+            if item:
+                fi = item.data(Qt.ItemDataRole.UserRole)
+                if fi:
+                    paths.append(fi.absoluteFilePath())
+        if not paths:
+            return
+        mime = QMimeData()
+        mime.setData(MIME_TYPE, QByteArray("\n".join(paths).encode("utf-8")))
+        drag = QDrag(self)
+        drag.setMimeData(mime)
+        drag.exec(Qt.DropAction.CopyAction)
+
+    def dragEnterEvent(self, event):
+        if event.mimeData().hasFormat(MIME_TYPE):
+            event.acceptProposedAction()
+        else:
+            super().dragEnterEvent(event)
+
+    def dragMoveEvent(self, event):
+        if event.mimeData().hasFormat(MIME_TYPE):
+            event.acceptProposedAction()
+        else:
+            super().dragMoveEvent(event)
+
+    def dropEvent(self, event):
+        if event.mimeData().hasFormat(MIME_TYPE):
+            data = event.mimeData().data(MIME_TYPE).data().decode("utf-8")
+            paths = [p for p in data.split("\n") if p]
+            self.files_dropped.emit(paths)
+            event.acceptProposedAction()
+        else:
+            super().dropEvent(event)
 
 
 class FilePane(QWidget):
     """A pane showing filesystem contents with path input controls."""
 
-    # Signals
-    path_changed = Signal(str)  # Emitted when the path is changed
-    item_double_clicked = Signal(
-        str, object
-    )  # Emitted when an item is double-clicked: (pane_id, index)
+    path_changed = Signal(str)
+    item_double_clicked = Signal(str, object)
+    copy_to_other_requested = Signal(list)
+    delete_requested = Signal(list)
+    rename_requested = Signal(str, str)
+    properties_requested = Signal(str)
+    open_requested = Signal(str)
 
     def __init__(self, title="Pane"):
         super().__init__()
@@ -32,7 +107,6 @@ class FilePane(QWidget):
     def setup_ui(self):
         layout = QVBoxLayout(self)
 
-        # Path input controls
         path_layout = QHBoxLayout()
         self.path_edit = QLineEdit()
         self.path_edit.setPlaceholderText("Enter path or browse...")
@@ -41,12 +115,10 @@ class FilePane(QWidget):
         path_layout.addWidget(self.path_edit)
         path_layout.addWidget(self.browse_btn)
 
-        # Tree view
-        self.tree_view = QTreeView()
+        self.tree_view = DropTreeView(self)
         self.model = QStandardItemModel()
         self.model.setHorizontalHeaderLabels(["Name", "Size", "Modified", "Status"])
         self.tree_view.setModel(self.model)
-        # Fix for Qt6 enum access - use QHeaderView.ResizeMode
         self.tree_view.header().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
         self.tree_view.header().setSectionResizeMode(
             1, QHeaderView.ResizeMode.ResizeToContents
@@ -59,16 +131,13 @@ class FilePane(QWidget):
         )
         self.tree_view.setAlternatingRowColors(True)
         self.tree_view.setSortingEnabled(True)
+        self.tree_view.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
 
-        # TODO: Implement drag and drop between panes
-        # For now, we rely on toolbar actions for copy/move
-
-        # Connect signals
         self.path_edit.returnPressed.connect(self._on_path_entered)
         self.browse_btn.clicked.connect(self._on_browse_clicked)
         self.tree_view.doubleClicked.connect(self._on_item_double_clicked)
+        self.tree_view.customContextMenuRequested.connect(self._on_context_menu)
 
-        # Add to layout
         layout.addLayout(path_layout)
         layout.addWidget(self.tree_view)
 
@@ -86,6 +155,55 @@ class FilePane(QWidget):
             selected_files = dialog.selectedFiles()
             if selected_files:
                 self.set_path(selected_files[0])
+
+    def _on_context_menu(self, pos):
+        index = self.tree_view.indexAt(pos)
+        if not index.isValid():
+            return
+        item = self.model.itemFromIndex(index.siblingAtColumn(0))
+        if not item:
+            return
+        file_info = item.data(Qt.ItemDataRole.UserRole)
+        if not file_info:
+            return
+
+        menu = QMenu(self)
+        open_action = menu.addAction("Open")
+        copy_action = menu.addAction("Copy to Other Side")
+        delete_action = menu.addAction("Delete")
+        rename_action = menu.addAction("Rename")
+        menu.addSeparator()
+        properties_action = menu.addAction("Properties")
+
+        chosen = menu.exec(self.tree_view.viewport().mapToGlobal(pos))
+        if chosen == open_action:
+            self.open_requested.emit(file_info.absoluteFilePath())
+        elif chosen == copy_action:
+            selected = self.tree_view.selectionModel().selectedRows(0)
+            paths = []
+            for idx in selected:
+                it = self.model.itemFromIndex(idx)
+                if it:
+                    fi = it.data(Qt.ItemDataRole.UserRole)
+                    if fi:
+                        paths.append(fi.absoluteFilePath())
+            self.copy_to_other_requested.emit(paths)
+        elif chosen == delete_action:
+            selected = self.tree_view.selectionModel().selectedRows(0)
+            paths = []
+            for idx in selected:
+                it = self.model.itemFromIndex(idx)
+                if it:
+                    fi = it.data(Qt.ItemDataRole.UserRole)
+                    if fi:
+                        paths.append(fi.absoluteFilePath())
+            self.delete_requested.emit(paths)
+        elif chosen == rename_action:
+            old_path = file_info.absoluteFilePath()
+            old_name = file_info.fileName()
+            self.rename_requested.emit(old_path, old_name)
+        elif chosen == properties_action:
+            self.properties_requested.emit(file_info.absoluteFilePath())
 
     def _on_item_double_clicked(self, index):
         # Get the item from the model (column 0, UserRole) which is a QFileInfo

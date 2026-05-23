@@ -10,6 +10,7 @@ from PySide6.QtWidgets import (
     QSplitter,
     QFileDialog,
     QInputDialog,
+    QMessageBox,
     QApplication,
 )
 from PySide6.QtCore import Qt, Slot, QThreadPool, QUrl
@@ -25,6 +26,9 @@ from src.ui.file_pane import FilePane
 from src.ui.diff_dialog import DiffDialog
 from src.core.worker import CompareWorker, WorkerSignals
 from src.core.hasher import Hasher
+from src.ui.settings_dialog import SettingsDialog
+from src.utils.config import load_config, save_config
+from src.utils.session import save_session, load_session, save_last_session, load_last_session, clear_last_session
 import os
 import shutil
 
@@ -34,9 +38,10 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.setWindowTitle("Beyond Compare Lite")
         self.resize(1200, 700)
-        self.hasher = Hasher("xxh3_64")
+        self._config = load_config()
+        algo = self._config["comparison"]["hash_algorithm"]
+        self.hasher = Hasher(algo)
         self.threadpool = QThreadPool()
-        # Toolbar actions
         self.action_compare = QAction("Compare", self)
         self.action_compare.setStatusTip("Compare the two directories")
         self.action_copy_left_to_right = QAction("Copy Left → Right", self)
@@ -55,10 +60,28 @@ class MainWindow(QMainWindow):
         self.action_open_with.setStatusTip(
             "Open selected item with default application"
         )
+        self.action_settings = QAction("Settings", self)
+        self.action_settings.setStatusTip("Open settings dialog")
+        self.action_save_session = QAction("Save Session...", self)
+        self.action_save_session.setStatusTip("Save comparison session to file")
+        self.action_load_session = QAction("Load Session...", self)
+        self.action_load_session.setStatusTip("Load comparison session from file")
         self.setup_ui()
         self.setup_connections()
+        self._try_restore_last_session()
 
     def setup_ui(self):
+        # Menu bar
+        menubar = self.menuBar()
+        file_menu = menubar.addMenu("File")
+        file_menu.addAction(self.action_save_session)
+        file_menu.addAction(self.action_load_session)
+        file_menu.addSeparator()
+        quit_action = QAction("Quit", self)
+        quit_action.setStatusTip("Exit the application")
+        quit_action.triggered.connect(self.close)
+        file_menu.addAction(quit_action)
+
         # Central widget
         central = QWidget()
         self.setCentralWidget(central)
@@ -87,6 +110,9 @@ class MainWindow(QMainWindow):
         # Open with action
         toolbar.addAction(self.action_open_with)
 
+        toolbar.addSeparator()
+        toolbar.addAction(self.action_settings)
+
         # Splitter for two panes
         splitter = QSplitter(Qt.Orientation.Horizontal)
         self.left_pane = FilePane("Left")
@@ -110,6 +136,15 @@ class MainWindow(QMainWindow):
         self.left_pane.item_double_clicked.connect(self.on_item_double_clicked_left)
         self.right_pane.item_double_clicked.connect(self.on_item_double_clicked_right)
 
+        # Connect context menu signals from both panes
+        for pane, other_label in [(self.left_pane, "right"), (self.right_pane, "left")]:
+            pane.copy_to_other_requested.connect(self._on_copy_to_other)
+            pane.delete_requested.connect(self._on_delete_from_context)
+            pane.rename_requested.connect(self._on_rename)
+            pane.properties_requested.connect(self._on_properties)
+            pane.open_requested.connect(self._on_open_file)
+            pane.tree_view.files_dropped.connect(self._on_files_dropped)
+
         # Connect toolbar actions
         self.action_compare.triggered.connect(self.start_comparison)
         self.action_copy_left_to_right.triggered.connect(self.copy_left_to_right)
@@ -117,6 +152,9 @@ class MainWindow(QMainWindow):
         self.action_delete.triggered.connect(self.delete_selected)
         self.action_new_folder.triggered.connect(self.new_folder)
         self.action_open_with.triggered.connect(self.open_with)
+        self.action_settings.triggered.connect(self.open_settings)
+        self.action_save_session.triggered.connect(self.save_session)
+        self.action_load_session.triggered.connect(self.load_session)
 
     @Slot(str, str)
     def on_item_double_clicked_left(self, pane_id, file_path):
@@ -178,6 +216,90 @@ class MainWindow(QMainWindow):
         self.status_label.setText(f"Right path: {path}")
 
     @Slot()
+    def open_settings(self):
+        dialog = SettingsDialog(self)
+        if dialog.exec():
+            self._config = dialog.get_config()
+            algo = self._config["comparison"]["hash_algorithm"]
+            self.hasher = Hasher(algo)
+            save_config(self._config)
+            self.status_label.setText("Settings saved")
+
+    def closeEvent(self, event):
+        left_path = self.left_pane.get_current_path() or ""
+        right_path = self.right_pane.get_current_path() or ""
+        save_last_session(left_path, right_path, self._config)
+        super().closeEvent(event)
+
+    def _try_restore_last_session(self):
+        session = load_last_session()
+        if not session:
+            return
+        if not session.get("left_path") and not session.get("right_path"):
+            return
+        reply = QMessageBox.question(
+            self,
+            "Restore Session",
+            "Restore last comparison session?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        )
+        if reply == QMessageBox.StandardButton.Yes:
+            self._apply_session(session)
+
+    def _apply_session(self, session: dict):
+        left = session.get("left_path", "")
+        right = session.get("right_path", "")
+        if left and os.path.exists(left):
+            self.left_pane.set_path(left)
+        if right and os.path.exists(right):
+            self.right_pane.set_path(right)
+        algo = session.get("hash_algorithm")
+        if algo:
+            self.hasher = Hasher(algo)
+            self._config["comparison"]["hash_algorithm"] = algo
+        patterns = session.get("ignore_patterns")
+        if patterns is not None:
+            self._config["ignore"]["patterns"] = patterns
+        show = session.get("show_identical")
+        if show is not None:
+            self._config["ignore"]["show_identical"] = show
+
+    @Slot()
+    def save_session(self):
+        left_path = self.left_pane.get_current_path() or ""
+        right_path = self.right_pane.get_current_path() or ""
+        file_path, _ = QFileDialog.getSaveFileName(
+            self, "Save Session", "", "Beyond Compare Session (*.bc-session)"
+        )
+        if not file_path:
+            return
+        data = {
+            "left_path": left_path,
+            "right_path": right_path,
+            "hash_algorithm": self._config["comparison"]["hash_algorithm"],
+            "ignore_patterns": self._config["ignore"]["patterns"],
+            "show_identical": self._config["ignore"]["show_identical"],
+        }
+        if save_session(file_path, data):
+            self.status_label.setText(f"Session saved: {file_path}")
+        else:
+            self.status_label.setText("Error saving session")
+
+    @Slot()
+    def load_session(self):
+        file_path, _ = QFileDialog.getOpenFileName(
+            self, "Load Session", "", "Beyond Compare Session (*.bc-session)"
+        )
+        if not file_path:
+            return
+        session = load_session(file_path)
+        if session is None:
+            self.status_label.setText("Error loading session")
+            return
+        self._apply_session(session)
+        self.status_label.setText(f"Session loaded: {file_path}")
+
+    @Slot()
     def start_comparison(self):
         left_path = self.left_pane.get_current_path()
         right_path = self.right_pane.get_current_path()
@@ -191,8 +313,10 @@ class MainWindow(QMainWindow):
             return
 
         self.status_label.setText("Comparing...")
-        # Create and start worker
-        worker = CompareWorker(left_path, right_path, self.hasher)
+        ignore_patterns = self._config["ignore"]["patterns"]
+        show_identical = self._config["ignore"]["show_identical"]
+        worker = CompareWorker(left_path, right_path, self.hasher, ignore_patterns)
+        worker.show_identical = show_identical
         worker.signals.update_item.connect(self.update_item_status)
         worker.signals.finished.connect(self.comparison_finished)
         worker.signals.progress.connect(self.update_progress)
@@ -511,6 +635,133 @@ class MainWindow(QMainWindow):
                     self.status_label.setText(f"Opened: {file_info.fileName()}")
                 except Exception as e:
                     self.status_label.setText(f"Error opening file: {str(e)}")
+
+    @Slot(list)
+    def _on_copy_to_other(self, paths):
+        pane = self.sender()
+        if pane == self.left_pane:
+            other_path = self.right_pane.get_current_path()
+            direction = "left to right"
+        else:
+            other_path = self.left_pane.get_current_path()
+            direction = "right to left"
+
+        if not other_path or not os.path.isdir(other_path):
+            self.status_label.setText("Other pane has no valid directory")
+            return
+
+        copied = 0
+        for src in paths:
+            name = os.path.basename(src)
+            dst = os.path.join(other_path, name)
+            try:
+                if os.path.isdir(src):
+                    shutil.copytree(src, dst, dirs_exist_ok=True)
+                else:
+                    shutil.copy2(src, dst)
+                copied += 1
+            except Exception as e:
+                self.status_label.setText(f"Error copying {name}: {e}")
+                return
+
+        self.status_label.setText(f"Copied {copied} item(s) {direction}")
+        self.left_pane.populate_tree(self.left_pane.get_current_path())
+        self.right_pane.populate_tree(self.right_pane.get_current_path())
+
+    @Slot(list)
+    def _on_delete_from_context(self, paths):
+        deleted = 0
+        for p in paths:
+            try:
+                if os.path.isdir(p):
+                    shutil.rmtree(p)
+                else:
+                    os.remove(p)
+                deleted += 1
+            except Exception as e:
+                self.status_label.setText(f"Error deleting {os.path.basename(p)}: {e}")
+                return
+
+        self.status_label.setText(f"Deleted {deleted} item(s)")
+        left = self.left_pane.get_current_path()
+        right = self.right_pane.get_current_path()
+        if left and os.path.isdir(left):
+            self.left_pane.populate_tree(left)
+        if right and os.path.isdir(right):
+            self.right_pane.populate_tree(right)
+
+    @Slot(str, str)
+    def _on_rename(self, old_path, old_name):
+        parent = os.path.dirname(old_path)
+        new_name, ok = QInputDialog.getText(
+            self, "Rename", "New name:", text=old_name
+        )
+        if not ok or not new_name or new_name == old_name:
+            return
+        new_path = os.path.join(parent, new_name)
+        try:
+            os.rename(old_path, new_path)
+            self.status_label.setText(f"Renamed to {new_name}")
+            left = self.left_pane.get_current_path()
+            right = self.right_pane.get_current_path()
+            if left and os.path.isdir(left):
+                self.left_pane.populate_tree(left)
+            if right and os.path.isdir(right):
+                self.right_pane.populate_tree(right)
+        except Exception as e:
+            self.status_label.setText(f"Error renaming: {e}")
+
+    @Slot(str)
+    def _on_properties(self, path):
+        try:
+            stat = os.stat(path)
+            is_dir = os.path.isdir(path)
+            size_str = f"{stat.st_size:,} bytes" if not is_dir else "<DIR>"
+            import time
+            modified = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(stat.st_mtime))
+            created = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(stat.st_ctime))
+            info = (
+                f"Path: {path}\n"
+                f"Type: {'Directory' if is_dir else 'File'}\n"
+                f"Size: {size_str}\n"
+                f"Modified: {modified}\n"
+                f"Created: {created}"
+            )
+        except OSError as e:
+            info = f"Path: {path}\nError: {e}"
+        QMessageBox.information(self, "Properties", info)
+
+    @Slot(str)
+    def _on_open_file(self, path):
+        try:
+            QDesktopServices.openUrl(QUrl.fromLocalFile(path))
+            self.status_label.setText(f"Opened: {os.path.basename(path)}")
+        except Exception as e:
+            self.status_label.setText(f"Error opening: {e}")
+
+    @Slot(list)
+    def _on_files_dropped(self, paths):
+        dest_pane = self.sender().pane
+        dest_dir = dest_pane.get_current_path()
+        if not dest_dir or not os.path.isdir(dest_dir):
+            self.status_label.setText("Drop target has no valid directory")
+            return
+        copied = 0
+        for src in paths:
+            name = os.path.basename(src)
+            dst = os.path.join(dest_dir, name)
+            try:
+                if os.path.isdir(src):
+                    shutil.copytree(src, dst, dirs_exist_ok=True)
+                else:
+                    shutil.copy2(src, dst)
+                copied += 1
+            except Exception as e:
+                self.status_label.setText(f"Error dropping {name}: {e}")
+                return
+        self.status_label.setText(f"Dropped {copied} item(s)")
+        self.left_pane.populate_tree(self.left_pane.get_current_path())
+        self.right_pane.populate_tree(self.right_pane.get_current_path())
 
     @Slot(str, str, str, str, object)
     def update_item_status(self, pane_id, file_name, status_text, color_hex, is_dir):

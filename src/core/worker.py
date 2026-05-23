@@ -1,6 +1,7 @@
 from PySide6.QtCore import QRunnable, QObject, Signal, Slot
 from ..core.hasher import Hasher, quick_compare
 import os
+import fnmatch
 from pathlib import Path
 from typing import Optional, Tuple, Dict, List
 
@@ -25,13 +26,14 @@ class CompareWorker(QRunnable):
     Worker thread for comparing two directories (immediate children) and updating the UI.
     """
 
-    def __init__(self, left_path: str, right_path: str, hasher: Hasher):
+    def __init__(self, left_path: str, right_path: str, hasher: Hasher, ignore_patterns: Optional[List[str]] = None):
         super().__init__()
         self.left_path = left_path
         self.right_path = right_path
         self.hasher = hasher
+        self.ignore_patterns = ignore_patterns or []
+        self.show_identical = True
         self.signals = WorkerSignals()
-        # We'll set auto delete to True so that the worker is deleted after execution
         self.setAutoDelete(True)
 
     @Slot()
@@ -53,22 +55,21 @@ class CompareWorker(QRunnable):
                 left_info = left_items.get(name)
                 right_info = right_items.get(name)
 
-                # Determine status and color for left pane
                 left_status, left_color = self._get_status_and_color(
                     left_info, right_info, is_left=True
                 )
-                # Determine status and color for right pane
                 right_status, right_color = self._get_status_and_color(
                     right_info, left_info, is_left=False
                 )
 
-                # Emit signals to update left pane
+                if not self.show_identical and left_status == "identical":
+                    continue
+
                 if left_info is not None:
                     is_dir = left_info["is_dir"]
                     self.signals.update_item.emit(
                         "left", name, left_status, left_color, is_dir
                     )
-                # Emit signals to update right pane
                 if right_info is not None:
                     is_dir = right_info["is_dir"]
                     self.signals.update_item.emit(
@@ -76,7 +77,7 @@ class CompareWorker(QRunnable):
                     )
 
                 processed += 1
-                if processed % 10 == 0:  # Emit progress every 10 items
+                if processed % 10 == 0:
                     self.signals.progress.emit(processed, total)
 
             # Emit final progress
@@ -99,7 +100,9 @@ class CompareWorker(QRunnable):
             with os.scandir(path) as it:
                 for entry in it:
                     if entry.name.startswith(".") and entry.name not in [".", ".."]:
-                        continue  # Skip hidden files by default
+                        continue
+                    if any(fnmatch.fnmatch(entry.name, p) for p in self.ignore_patterns):
+                        continue
                     info = entry.stat()
                     items[entry.name] = {
                         "is_dir": entry.is_dir(),
@@ -107,7 +110,6 @@ class CompareWorker(QRunnable):
                         "mtime": info.st_mtime,
                     }
         except (OSError, IOError, PermissionError):
-            # If we can't scan, return empty dict
             pass
         return items
 

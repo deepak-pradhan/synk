@@ -8,4 +8,17 @@ dependencies = [
     "diff-match-patch>=20241021",
     "pyside6>=6.11.0",
     "xxhash>=3.6.0",
+    "tomli-w>=1.2.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+markers = [
+    "gui: tests requiring a display (X11/Wayland) — skipped headless",
 ]
