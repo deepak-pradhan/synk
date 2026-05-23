@@ -18,11 +18,12 @@ uv run python -m src.main  # launch GUI (requires X11/Wayland)
 ## Project layout
 ```
 src/
-├── core/       hasher.py, worker.py (QRunnable)
+├── core/       hasher.py, worker.py (QRunnable), archive.py (ZIP/TAR browsing)
 ├── ui/         main_window.py, file_pane.py, diff_dialog.py, settings_dialog.py
 └── utils/      config.py, session.py
 tests/
 ├── test_hasher.py
+├── test_archive.py      # archive module (headless)
 └── test_prototype.py   # marked @pytest.mark.gui, skipped headless
 ```
 
@@ -39,8 +40,8 @@ uv run pytest -v                  # verbose
 ```
 
 ## Current state (prototype)
-Working: side-by-side file panes, hash comparison (xxh3_64 default), diff dialog, toolbar actions (copy/delete/new folder/open), context menu (right-click: open/copy/delete/rename/properties), drag-and-drop between panes, settings dialog (hash algo/theme/ignore patterns), session save/load (File menu, auto-restore on startup).
-Not yet: archive support, SFTP/remote, CLI mode, CI.
+Working: side-by-side file panes, hash comparison (xxh3_64 default), diff dialog, toolbar actions (copy/delete/new folder/open), context menu (right-click: open/copy/delete/rename/properties), drag-and-drop between panes, settings dialog (hash algo/theme/ignore patterns), session save/load (File menu, auto-restore on startup), archive browsing (ZIP/TAR.GZ/TAR.BZ2/TAR.XZ).
+Not yet: SFTP/remote, CLI mode, CI.
 
 ## Config & sessions
 - Config stored at `~/.config/beyondcomp/config.toml` (uses stdlib `tomllib` + `tomli-w`).
@@ -53,3 +54,5 @@ Not yet: archive support, SFTP/remote, CLI mode, CI.
 - Worker uses `QRunnable` + `QThreadPool` — signals for progress, never block the main thread.
 - Hidden files (dotfiles) are skipped during comparison.
 - Status colors: green (identical), salmon (different), pink (left-only), light blue (right-only).
+- Archive browsing uses stdlib `zipfile` + `tarfile` — no external C deps. Double-click an archive to navigate inside; `..` goes back out.
+- Archive paths use `archive:/path/to/file.zip` prefix internally. `FilePane._archive_path` and `_archive_prefix` track state.

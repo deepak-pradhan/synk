@@ -2,7 +2,7 @@
 
 A personal file/folder comparison utility for Linux, similar to Beyond Compare.
 
-**Status:** Prototype. Core features working: side-by-side panes, hash comparison, diff dialog, file operations, settings persistence, session save/load, context menus, drag-and-drop.
+**Status:** Prototype. Core features working: side-by-side panes, hash comparison, diff dialog, file operations, settings persistence, session save/load, context menus, drag-and-drop, archive browsing.
 
 ## Stack
 
@@ -33,7 +33,8 @@ src/
 ├── main.py              # Entry point
 ├── core/
 │   ├── hasher.py        # xxHash content hashing (multi-algo)
-│   └── worker.py        # Background comparison worker (QRunnable)
+│   ├── worker.py        # Background comparison worker (QRunnable)
+│   └── archive.py       # ZIP/TAR archive browsing + extraction
 ├── ui/
 │   ├── main_window.py   # Main window / toolbar / menu
 │   ├── file_pane.py     # Side-by-side file display + DnD + context menu
@@ -44,6 +45,7 @@ src/
     └── session.py       # Session load/save (.bc-session files)
 tests/
 ├── test_hasher.py       # Unit tests (headless)
+├── test_archive.py      # Archive module tests (headless)
 └── test_prototype.py    # GUI integration tests (needs display)
 ```
 
@@ -58,6 +60,7 @@ tests/
 - Settings dialog with persistent config (`~/.config/beyondcomp/config.toml`)
 - Session save/load (`File → Save/Load Session`, auto-restore on startup)
 - Ignore patterns (glob) to filter out files
+- Archive browsing — double-click a .zip/.tar.gz to navigate inside like a folder
 
 ## Roadmap
 
@@ -71,7 +74,7 @@ tests/
 - [x] Session save/load with auto-restore
 - [x] Ignore patterns support
 - [x] pytest setup with gui/headless markers
-- [ ] Archive support (ZIP, TAR, GZ)
+- [x] Archive support (ZIP, TAR, GZ, BZ2, XZ) — browse inside archives
 - [ ] SFTP/remote comparison
 - [ ] CLI for headless diff
 - [ ] CI

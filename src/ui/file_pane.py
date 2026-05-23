@@ -28,8 +28,10 @@ from PySide6.QtGui import (
 )
 import os
 from pathlib import Path
+from src.core.archive import is_archive, list_archive_at_depth, extract_file
 
 MIME_TYPE = "application/x-beyondcomp-filepaths"
+ARCHIVE_PREFIX = "archive:"
 
 
 class DropTreeView(QTreeView):
@@ -102,6 +104,8 @@ class FilePane(QWidget):
         super().__init__()
         self.title = title
         self.current_path = ""
+        self._archive_path = None
+        self._archive_prefix = ""
         self.setup_ui()
 
     def setup_ui(self):
@@ -206,27 +210,156 @@ class FilePane(QWidget):
             self.properties_requested.emit(file_info.absoluteFilePath())
 
     def _on_item_double_clicked(self, index):
-        # Get the item from the model (column 0, UserRole) which is a QFileInfo
         item = self.model.itemFromIndex(index.siblingAtColumn(0))
-        if item:
-            file_info = item.data(Qt.ItemDataRole.UserRole)
-            if file_info and file_info.isDir():
-                # If it's a directory, navigate into it
-                self.set_path(file_info.absoluteFilePath())
-            elif file_info and not file_info.isDir():
-                # If it's a file, emit the signal for the main window to handle
-                self.item_double_clicked.emit(
-                    "left" if self.title == "Left" else "right", file_info
-                )
+        if not item:
+            return
+
+        # Check if this is a "navigate back" entry
+        nav_path = item.data(Qt.ItemDataRole.UserRole + 1)
+        if nav_path and isinstance(nav_path, str):
+            if nav_path == "..exit_archive":
+                self._exit_archive()
+                return
+            elif nav_path.startswith(ARCHIVE_PREFIX):
+                self.set_path(nav_path)
+                return
+            elif nav_path == "..parent":
+                parent = os.path.dirname(self.current_path)
+                if parent and parent != self.current_path:
+                    self.set_path(parent)
+                return
+
+        file_info = item.data(Qt.ItemDataRole.UserRole)
+        if not file_info:
+            return
+
+        # Check if clicking on an archive file in normal filesystem mode
+        if not self._archive_path and file_info.isFile() and is_archive(file_info.absoluteFilePath()):
+            self._enter_archive(file_info.absoluteFilePath())
+            return
+
+        if file_info.isDir():
+            self.set_path(file_info.absoluteFilePath())
+        else:
+            self.item_double_clicked.emit(
+                "left" if self.title == "Left" else "right", file_info
+            )
+
+    def _enter_archive(self, archive_path: str):
+        """Navigate into an archive file."""
+        self._archive_path = archive_path
+        self._archive_prefix = ""
+        display = f"{ARCHIVE_PREFIX}{archive_path}"
+        self.current_path = display
+        self.path_edit.setText(display)
+        self.path_edit.setStyleSheet("")
+        self._populate_archive_contents()
+        self.path_changed.emit(display)
+
+    def _exit_archive(self):
+        """Exit archive browsing mode, return to the archive's parent directory."""
+        if self._archive_path:
+            parent = os.path.dirname(self._archive_path)
+            self._archive_path = None
+            self._archive_prefix = ""
+            if parent and os.path.isdir(parent):
+                self.set_path(parent)
+
+    def _navigate_archive_up(self):
+        """Navigate up one level inside the archive, or exit if at top."""
+        if not self._archive_prefix:
+            self._exit_archive()
+            return
+        parts = self._archive_prefix.rstrip("/").rsplit("/", 1)
+        self._archive_prefix = parts[0] if len(parts) > 1 else ""
+        self._populate_archive_contents()
+
+    def _populate_archive_contents(self):
+        """Populate tree view with archive entries at the current prefix depth."""
+        from src.core.archive import list_archive_at_depth as list_entries
+
+        self.model.removeRows(0, self.model.rowCount())
+
+        entries = list_entries(self._archive_path, self._archive_prefix)
+        if not entries:
+            error_item = QStandardItem("(empty or unreadable archive)")
+            error_item.setEditable(False)
+            self.model.appendRow([error_item, QStandardItem(""), QStandardItem(""), QStandardItem("")])
+            return
+
+        # Add ".." entry to go back
+        if self._archive_prefix:
+            parent_key = "..archive_up"
+        else:
+            parent_key = "..exit_archive"
+        dot_item = QStandardItem("..")
+        dot_item.setData(QFileInfo(self._archive_path), Qt.ItemDataRole.UserRole)
+        dot_item.setData(parent_key, Qt.ItemDataRole.UserRole + 1)
+        dot_item.setEditable(False)
+        dir_size = QStandardItem("<DIR>")
+        dir_size.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        self.model.appendRow([dot_item, dir_size, QStandardItem(""), QStandardItem("")])
+
+        for entry in entries:
+            display_name = entry.name.split("/")[-1] if "/" in entry.name else entry.name
+            name_item = QStandardItem(display_name if not entry.is_dir else display_name + "/")
+            name_item.setEditable(False)
+
+            if entry.is_dir:
+                size_item = QStandardItem("<DIR>")
+                full_nav = f"{ARCHIVE_PREFIX}{self._archive_path}/{entry.name}"
+                name_item.setData(full_nav, Qt.ItemDataRole.UserRole + 1)
+            else:
+                size_item = QStandardItem(str(entry.size))
+                name_item.setData(None, Qt.ItemDataRole.UserRole + 1)
+
+            size_item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+            modified_item = QStandardItem("")
+            modified_item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+
+            status_item = QStandardItem("in-archive")
+            status_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+
+            # Store QFileInfo pointing to the archive itself for context menu ops
+            name_item.setData(QFileInfo(self._archive_path), Qt.ItemDataRole.UserRole)
+
+            self.model.appendRow([name_item, size_item, modified_item, status_item])
 
     def set_path(self, path):
         """Set the current path and populate the tree view."""
+        # Handle archive-prefixed paths
+        if isinstance(path, str) and path.startswith(ARCHIVE_PREFIX):
+            rest = path[len(ARCHIVE_PREFIX):]
+            # Split: first segment is the archive file, rest is the prefix
+            # Find the archive file - try longest match that is an existing file
+            archive_file = None
+            inner = ""
+            parts = rest.split("/")
+            for i in range(len(parts), 0, -1):
+                candidate = "/".join(parts[:i])
+                if os.path.isfile(candidate):
+                    archive_file = candidate
+                    inner = "/".join(parts[i:])
+                    break
+            if archive_file and is_archive(archive_file):
+                self._archive_path = archive_file
+                self._archive_prefix = inner
+                self.current_path = path
+                self.path_edit.setText(path)
+                self.path_edit.setStyleSheet("")
+                self._populate_archive_contents()
+                self.path_changed.emit(path)
+                return
+            # If not an archive path, fall through to normal handling
+
         if not os.path.exists(path):
             return
 
+        self._archive_path = None
+        self._archive_prefix = ""
         self.current_path = path
         self.path_edit.setText(path)
-        self.path_edit.setStyleSheet("")  # Clear error styling
+        self.path_edit.setStyleSheet("")
         self.populate_tree(path)
         self.path_changed.emit(path)
 
@@ -235,84 +368,70 @@ class FilePane(QWidget):
         self.model.removeRows(0, self.model.rowCount())
 
         if not os.path.isdir(path):
-            # Show single file
+            if os.path.isfile(path) and is_archive(path):
+                self._enter_archive(path)
+                return
             self._add_file_to_model(path)
             return
 
         try:
-            # Add parent directory entry (..) if not at root
             parent_dir = os.path.dirname(path)
-            if path != parent_dir:  # Not root
+            if path != parent_dir:
                 parent_item = QStandardItem("..")
                 parent_item.setData(QFileInfo(parent_dir), Qt.ItemDataRole.UserRole)
+                parent_item.setData("..parent", Qt.ItemDataRole.UserRole + 1)
                 parent_item.setEditable(False)
-                # Create empty items for other columns
                 size_item = QStandardItem("<DIR>")
-                size_item.setTextAlignment(
-                    Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
-                )
+                size_item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
                 modified_item = QStandardItem("")
-                modified_item.setTextAlignment(
-                    Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
-                )
+                modified_item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
                 status_item = QStandardItem("")
                 status_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-                self.model.appendRow(
-                    [parent_item, size_item, modified_item, status_item]
-                )
+                self.model.appendRow([parent_item, size_item, modified_item, status_item])
 
-            # Collect directories and files
             dirs = []
             files = []
 
             with os.scandir(path) as it:
                 for entry in it:
                     if entry.name.startswith(".") and entry.name not in [".", ".."]:
-                        continue  # Skip hidden files by default
-
+                        continue
                     if entry.is_dir():
                         dirs.append(entry)
                     else:
                         files.append(entry)
 
-            # Sort directories and files by name (case-insensitive)
             dirs.sort(key=lambda e: e.name.lower())
             files.sort(key=lambda e: e.name.lower())
 
-            # Add directories
             for entry in dirs:
                 self._add_file_to_model(entry.path)
-
-            # Add files
             for entry in files:
                 self._add_file_to_model(entry.path)
 
         except PermissionError:
-            # Show error in tree
             error_item = QStandardItem("Access Denied")
             error_item.setData(QFileInfo(path), Qt.ItemDataRole.UserRole)
             size_item = QStandardItem("")
-            size_item.setTextAlignment(
-                Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
-            )
+            size_item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
             modified_item = QStandardItem("")
-            modified_item.setTextAlignment(
-                Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
-            )
+            modified_item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
             status_item = QStandardItem("ERROR")
             status_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
             self.model.appendRow([error_item, size_item, modified_item, status_item])
 
     def _add_file_to_model(self, file_path):
         """Add a single file or directory to the model."""
+        from src.core.archive import is_archive as is_arch
+
         file_info = QFileInfo(file_path)
         name = file_info.fileName()
 
-        # Determine if it's a directory
         is_dir = file_info.isDir()
+        is_arch_file = not is_dir and file_info.isFile() and is_arch(file_path)
 
-        # Create items for each column
-        name_item = QStandardItem(name)
+        name_text = name + " 📦" if is_arch_file else name
+        name_item = QStandardItem(name_text)
         name_item.setData(file_info, Qt.ItemDataRole.UserRole)
         name_item.setEditable(False)
 
@@ -320,31 +439,24 @@ class FilePane(QWidget):
             size_item = QStandardItem("<DIR>")
         else:
             size_item = QStandardItem(str(file_info.size()))
-        size_item.setTextAlignment(
-            Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
-        )
+        size_item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
 
         modified_time = file_info.lastModified().toString("yyyy-MM-dd hh:mm")
         modified_item = QStandardItem(modified_time)
-        modified_item.setTextAlignment(
-            Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
-        )
+        modified_item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
 
-        status_item = QStandardItem("unknown")
+        status_item = QStandardItem("archive" if is_arch_file else "unknown")
         status_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        # Add the row to the model
         self.model.appendRow([name_item, size_item, modified_item, status_item])
 
     def set_item_status(self, index, status_text, color=None):
         """Set the status and background color for an item in the status column."""
         if index.isValid():
-            # Set the text in the status column (column 3)
             status_item = QStandardItem(status_text)
             status_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
             if color:
                 status_item.setBackground(QBrush(QColor(color)))
-            # Replace the item in the model
             self.model.setItem(index.row(), 3, status_item)
 
     def get_current_path(self):
@@ -356,3 +468,13 @@ class FilePane(QWidget):
         self.model.removeRows(0, self.model.rowCount())
         self.path_edit.clear()
         self.current_path = ""
+        self._archive_path = None
+        self._archive_prefix = ""
+
+    def is_in_archive(self) -> bool:
+        """Return True if currently browsing inside an archive."""
+        return self._archive_path is not None
+
+    def get_archive_info(self):
+        """Return (archive_path, inner_prefix) if in archive mode, else (None, '')."""
+        return self._archive_path, self._archive_prefix
