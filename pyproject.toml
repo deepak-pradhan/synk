@@ -6,9 +6,9 @@ build-backend = "hatchling.build"
 packages = ["src"]
 
 [project]
-name = "3it-services-beyondcompare"
-version = "0.1.0"
-description = "Add your description here"
+name = "synk-diff"
+version = "0.2.0"
+description = "Cross-platform file/folder diff and merge tool with GUI, CLI, archive browsing, and 3-way merge."
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
@@ -21,6 +21,10 @@ dependencies = [
 
 [project.scripts]
 synk = "src.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/deepak-pradhan/synk"
+Repository = "https://github.com/deepak-pradhan/synk"
 
 [dependency-groups]
 dev = [

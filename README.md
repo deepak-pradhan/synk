@@ -28,13 +28,6 @@ uv run python -m src.cli hash file1.txt file2.txt
 - tomli-w (TOML config writes)
 - paramiko (SFTP remote connections)
 
-## Quick Start
-
-```bash
-uv sync
-uv run python -m src.main
-```
-
 ## Testing
 
 ```bash
