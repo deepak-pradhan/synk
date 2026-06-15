@@ -1,8 +1,24 @@
-# Beyond Compare Clone
+# Synk — Cross-Platform Diff & Merge Tool
 
-A personal file/folder comparison utility for Linux, similar to Beyond Compare.
+A personal file/folder comparison utility for Linux, inspired by Beyond Compare.
 
-**Status:** Prototype. Core features working: side-by-side panes, hash comparison, diff dialog, file operations, settings persistence, session save/load, context menus, drag-and-drop, archive browsing, SFTP remote.
+**Status:** Prototype. Core features working: side-by-side panes, hash comparison, diff dialog, file operations, settings persistence, session save/load, context menus, drag-and-drop, archive browsing, SFTP remote, CLI mode.
+
+## Quick Start
+
+### GUI (requires X11/Wayland)
+```bash
+uv sync
+uv run python -m src.main
+```
+
+### CLI (headless)
+```bash
+uv run python -m src.cli diff file1.txt file2.txt
+uv run python -m src.cli diff dir1/ dir2/
+uv run python -m src.cli hash file1.txt file2.txt
+```
+
 
 ## Stack
 
