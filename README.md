@@ -2,7 +2,7 @@
 
 A personal file/folder comparison utility for Linux, similar to Beyond Compare.
 
-**Status:** Prototype. Core features working: side-by-side panes, hash comparison, diff dialog, file operations, settings persistence, session save/load, context menus, drag-and-drop, archive browsing.
+**Status:** Prototype. Core features working: side-by-side panes, hash comparison, diff dialog, file operations, settings persistence, session save/load, context menus, drag-and-drop, archive browsing, SFTP remote.
 
 ## Stack
 
@@ -10,6 +10,7 @@ A personal file/folder comparison utility for Linux, similar to Beyond Compare.
 - diff-match-patch (Myers diff algorithm)
 - xxHash (content hashing for fast file matching)
 - tomli-w (TOML config writes)
+- paramiko (SFTP remote connections)
 
 ## Quick Start
 
@@ -34,18 +35,21 @@ src/
 ├── core/
 │   ├── hasher.py        # xxHash content hashing (multi-algo)
 │   ├── worker.py        # Background comparison worker (QRunnable)
-│   └── archive.py       # ZIP/TAR archive browsing + extraction
+│   ├── archive.py       # ZIP/TAR archive browsing + extraction
+│   └── remote.py        # SFTP connection + remote file ops
 ├── ui/
 │   ├── main_window.py   # Main window / toolbar / menu
 │   ├── file_pane.py     # Side-by-side file display + DnD + context menu
 │   ├── diff_dialog.py   # Inline diff view
-│   └── settings_dialog.py # Settings (hash algo, theme, ignore patterns)
+│   ├── settings_dialog.py # Settings (hash algo, theme, ignore patterns)
+│   └── sftp_connect_dialog.py # SFTP connection dialog
 └── utils/
     ├── config.py        # TOML config load/save (~/.config/beyondcomp/)
     └── session.py       # Session load/save (.bc-session files)
 tests/
 ├── test_hasher.py       # Unit tests (headless)
 ├── test_archive.py      # Archive module tests (headless)
+├── test_remote.py       # Remote module tests (headless)
 └── test_prototype.py    # GUI integration tests (needs display)
 ```
 
@@ -61,6 +65,7 @@ tests/
 - Session save/load (`File → Save/Load Session`, auto-restore on startup)
 - Ignore patterns (glob) to filter out files
 - Archive browsing — double-click a .zip/.tar.gz to navigate inside like a folder
+- SFTP remote panel — Connect SFTP button or type sftp://user@host:port/path
 
 ## Roadmap
 
@@ -75,6 +80,6 @@ tests/
 - [x] Ignore patterns support
 - [x] pytest setup with gui/headless markers
 - [x] Archive support (ZIP, TAR, GZ, BZ2, XZ) — browse inside archives
-- [ ] SFTP/remote comparison
+- [x] SFTP/remote comparison (browse remote server via SFTP)
 - [ ] CLI for headless diff
 - [ ] CI

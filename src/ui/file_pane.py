@@ -29,6 +29,7 @@ from PySide6.QtGui import (
 import os
 from pathlib import Path
 from src.core.archive import is_archive, list_archive_at_depth, extract_file
+from src.core.remote import SFTPConnection, SFTPCredentials, parse_sftp_url, get_remote_path
 
 MIME_TYPE = "application/x-beyondcomp-filepaths"
 ARCHIVE_PREFIX = "archive:"
@@ -106,6 +107,7 @@ class FilePane(QWidget):
         self.current_path = ""
         self._archive_path = None
         self._archive_prefix = ""
+        self._sftp_conn: SFTPConnection | None = None
         self.setup_ui()
 
     def setup_ui(self):
@@ -113,11 +115,13 @@ class FilePane(QWidget):
 
         path_layout = QHBoxLayout()
         self.path_edit = QLineEdit()
-        self.path_edit.setPlaceholderText("Enter path or browse...")
+        self.path_edit.setPlaceholderText("Enter path or sftp://user@host/path...")
         self.browse_btn = QPushButton("Browse...")
+        self.sftp_btn = QPushButton("Connect SFTP...")
 
         path_layout.addWidget(self.path_edit)
         path_layout.addWidget(self.browse_btn)
+        path_layout.addWidget(self.sftp_btn)
 
         self.tree_view = DropTreeView(self)
         self.model = QStandardItemModel()
@@ -139,6 +143,7 @@ class FilePane(QWidget):
 
         self.path_edit.returnPressed.connect(self._on_path_entered)
         self.browse_btn.clicked.connect(self._on_browse_clicked)
+        self.sftp_btn.clicked.connect(self._on_sftp_clicked)
         self.tree_view.doubleClicked.connect(self._on_item_double_clicked)
         self.tree_view.customContextMenuRequested.connect(self._on_context_menu)
 
@@ -147,7 +152,25 @@ class FilePane(QWidget):
 
     def _on_path_entered(self):
         path = self.path_edit.text().strip()
-        if path and os.path.exists(path):
+        if not path:
+            return
+        if path.startswith(SFTP_PREFIX):
+            from src.ui.sftp_connect_dialog import SFTPConnectDialog
+            creds = parse_sftp_url(path)
+            remote_path = get_remote_path(path)
+            conn = SFTPConnection(creds)
+            error = conn.connect()
+            if error:
+                self.path_edit.setStyleSheet("border: 1px solid red;")
+                return
+            self._sftp_conn = conn
+            display = f"sftp://{creds.username}@{creds.host}:{creds.port}{remote_path}"
+            self.current_path = display
+            self.path_edit.setText(display)
+            self.path_edit.setStyleSheet("")
+            self._populate_remote(remote_path)
+            self.path_changed.emit(display)
+        elif path and os.path.exists(path):
             self.set_path(path)
         else:
             self.path_edit.setStyleSheet("border: 1px solid red;")
@@ -159,6 +182,75 @@ class FilePane(QWidget):
             selected_files = dialog.selectedFiles()
             if selected_files:
                 self.set_path(selected_files[0])
+
+    def _on_sftp_clicked(self):
+        from src.ui.sftp_connect_dialog import SFTPConnectDialog
+        dialog = SFTPConnectDialog(self)
+        if dialog.exec():
+            creds = dialog.get_credentials()
+            remote_path = dialog.get_remote_path()
+            conn = SFTPConnection(creds)
+            error = conn.connect()
+            if error:
+                self.path_edit.setStyleSheet("border: 1px solid red;")
+                return
+            self._sftp_conn = conn
+            display = f"sftp://{creds.username}@{creds.host}:{creds.port}{remote_path}"
+            self.current_path = display
+            self.path_edit.setText(display)
+            self.path_edit.setStyleSheet("")
+            self._populate_remote(remote_path)
+            self.path_changed.emit(display)
+
+    def _populate_remote(self, remote_path: str):
+        """Populate tree view with remote SFTP directory contents."""
+        if not self._sftp_conn or not self._sftp_conn.connected:
+            return
+        self.model.removeRows(0, self.model.rowCount())
+        entries = self._sftp_conn.list_dir(remote_path)
+        if not entries:
+            empty_item = QStandardItem("(empty or unreadable directory)")
+            empty_item.setEditable(False)
+            self.model.appendRow([empty_item, QStandardItem(""), QStandardItem(""), QStandardItem("")])
+            return
+
+        if remote_path != "/":
+            parent = remote_path.rsplit("/", 1)[0] or "/"
+            parent_item = QStandardItem("..")
+            parent_item.setData(None, Qt.ItemDataRole.UserRole)
+            parent_item.setData(f"sftp_parent:{parent}", Qt.ItemDataRole.UserRole + 1)
+            parent_item.setEditable(False)
+            dir_size = QStandardItem("<DIR>")
+            dir_size.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+            self.model.appendRow([parent_item, dir_size, QStandardItem(""), QStandardItem("")])
+
+        dirs = [e for e in entries if e.is_dir]
+        files = [e for e in entries if not e.is_dir]
+        dirs.sort(key=lambda e: e.name.lower())
+        files.sort(key=lambda e: e.name.lower())
+
+        for entry in dirs + files:
+            display = entry.name + "/" if entry.is_dir else entry.name
+            name_item = QStandardItem(display)
+            name_item.setEditable(False)
+            name_item.setData(QFileInfo(entry.path), Qt.ItemDataRole.UserRole)
+            nav_key = f"sftp_nav:{entry.path}" if entry.is_dir else None
+            name_item.setData(nav_key, Qt.ItemDataRole.UserRole + 1) if nav_key else None
+
+            size_item = QStandardItem("<DIR>" if entry.is_dir else str(entry.size))
+            size_item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+
+            from datetime import datetime
+            try:
+                mod_str = datetime.fromtimestamp(entry.mtime).strftime("%Y-%m-%d %H:%M")
+            except (OSError, ValueError):
+                mod_str = ""
+            modified_item = QStandardItem(mod_str)
+            modified_item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+
+            status_item = QStandardItem("remote")
+            status_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.model.appendRow([name_item, size_item, modified_item, status_item])
 
     def _on_context_menu(self, pos):
         index = self.tree_view.indexAt(pos)
@@ -227,6 +319,20 @@ class FilePane(QWidget):
                 parent = os.path.dirname(self.current_path)
                 if parent and parent != self.current_path:
                     self.set_path(parent)
+                return
+            elif nav_path.startswith("sftp_parent:"):
+                new_path = nav_path[len("sftp_parent:"):]
+                self.current_path = f"sftp://{self._sftp_conn.creds.username}@{self._sftp_conn.creds.host}:{self._sftp_conn.creds.port}{new_path}"
+                self.path_edit.setText(self.current_path)
+                self._populate_remote(new_path)
+                self.path_changed.emit(self.current_path)
+                return
+            elif nav_path.startswith("sftp_nav:"):
+                remote_path = nav_path[len("sftp_nav:"):]
+                self.current_path = f"sftp://{self._sftp_conn.creds.username}@{self._sftp_conn.creds.host}:{self._sftp_conn.creds.port}{remote_path}"
+                self.path_edit.setText(self.current_path)
+                self._populate_remote(remote_path)
+                self.path_changed.emit(self.current_path)
                 return
 
         file_info = item.data(Qt.ItemDataRole.UserRole)
@@ -327,6 +433,18 @@ class FilePane(QWidget):
 
     def set_path(self, path):
         """Set the current path and populate the tree view."""
+        # Handle SFTP URLs
+        if isinstance(path, str) and path.startswith(SFTP_PREFIX):
+            if not self._sftp_conn or not self._sftp_conn.connected:
+                return
+            remote_path = get_remote_path(path)
+            self.current_path = path
+            self.path_edit.setText(path)
+            self.path_edit.setStyleSheet("")
+            self._populate_remote(remote_path)
+            self.path_changed.emit(path)
+            return
+
         # Handle archive-prefixed paths
         if isinstance(path, str) and path.startswith(ARCHIVE_PREFIX):
             rest = path[len(ARCHIVE_PREFIX):]
@@ -463,6 +581,12 @@ class FilePane(QWidget):
         """Get the current path being displayed."""
         return self.current_path
 
+    def disconnect_sftp(self):
+        """Disconnect SFTP if connected."""
+        if self._sftp_conn:
+            self._sftp_conn.disconnect()
+            self._sftp_conn = None
+
     def clear(self):
         """Clear the tree view."""
         self.model.removeRows(0, self.model.rowCount())
@@ -470,6 +594,9 @@ class FilePane(QWidget):
         self.current_path = ""
         self._archive_path = None
         self._archive_prefix = ""
+        if self._sftp_conn:
+            self._sftp_conn.disconnect()
+            self._sftp_conn = None
 
     def is_in_archive(self) -> bool:
         """Return True if currently browsing inside an archive."""
