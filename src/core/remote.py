@@ -155,6 +155,16 @@ class SFTPConnection:
         except Exception:
             return None
 
+    def read_text(self, remote_path: str, encoding: str = "utf-8") -> Optional[str]:
+        """Read a remote file as text."""
+        if not self._sftp:
+            return None
+        try:
+            with self._sftp.open(remote_path, "rb") as f:
+                return f.read().decode(encoding)
+        except Exception:
+            return None
+
     def download_file(self, remote_path: str, local_path: str) -> bool:
         """Download a remote file to a local path."""
         if not self._sftp:

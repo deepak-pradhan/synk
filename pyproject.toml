@@ -12,6 +12,9 @@ dependencies = [
     "xxhash>=3.6.0",
 ]
 
+[project.scripts]
+synk = "src.cli:main"
+
 [dependency-groups]
 dev = [
     "pytest>=8.0",

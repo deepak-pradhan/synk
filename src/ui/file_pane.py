@@ -33,6 +33,7 @@ from src.core.remote import SFTPConnection, SFTPCredentials, parse_sftp_url, get
 
 MIME_TYPE = "application/x-beyondcomp-filepaths"
 ARCHIVE_PREFIX = "archive:"
+SFTP_PREFIX = "sftp://"
 
 
 class DropTreeView(QTreeView):
