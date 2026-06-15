@@ -15,6 +15,7 @@ import os
 from pathlib import Path
 
 from src.core.hasher import Hasher
+from src.core.merge import three_way_merge
 from diff_match_patch import diff_match_patch
 
 
@@ -134,6 +135,14 @@ def main() -> int:
     hash_parser.add_argument("paths", nargs="+")
     hash_parser.add_argument("--algo", default="xxh3_64", choices=["xxh3_64", "xxh64", "md5", "sha1", "sha256"])
 
+    # merge
+    merge_parser = subparsers.add_parser("merge", help="3-way merge of base, local, remote files")
+    merge_parser.add_argument("base")
+    merge_parser.add_argument("local")
+    merge_parser.add_argument("remote")
+    merge_parser.add_argument("--output", "-o", help="Write merged result to file (default: stdout)")
+    merge_parser.add_argument("--gui", action="store_true", help="Launch GUI merge dialog (requires display)")
+
     args = parser.parse_args()
 
     if args.command == "diff":
@@ -142,9 +151,57 @@ def main() -> int:
         return do_file_diff(args.path1, args.path2)
     elif args.command == "hash":
         return do_hash(args.paths, args.algo)
+    elif args.command == "merge":
+        return do_merge(args.base, args.local, args.remote, args.output, args.gui)
     else:
         parser.print_help()
         return 1
+
+
+def do_merge(base_path: str, local_path: str, remote_path: str, output: str | None, use_gui: bool) -> int:
+    """Perform a 3-way merge and output result."""
+    base_text = _read_text(base_path)
+    local_text = _read_text(local_path)
+    remote_text = _read_text(remote_path)
+
+    if base_text is None:
+        print(f"Error: Cannot read base: {base_path}", file=sys.stderr)
+        return 1
+    if local_text is None:
+        print(f"Error: Cannot read local: {local_path}", file=sys.stderr)
+        return 1
+    if remote_text is None:
+        print(f"Error: Cannot read remote: {remote_path}", file=sys.stderr)
+        return 1
+
+    if use_gui:
+        from PySide6.QtWidgets import QApplication
+        from src.ui.merge_dialog import MergeDialog
+        app = QApplication.instance() or QApplication(sys.argv)
+        dialog = MergeDialog(base_text, local_text, remote_text,
+                             base_label=base_path, local_label=local_path, remote_label=remote_path)
+        dialog.exec()
+        if dialog.result is not None:
+            if output:
+                with open(output, "w", encoding="utf-8") as f:
+                    f.write(dialog.result)
+                print(f"Merge written to {output}")
+            else:
+                print(dialog.result)
+            return 0
+        return 1
+
+    result = three_way_merge(base_text, local_text, remote_text)
+    text = result.to_text()
+
+    if output:
+        with open(output, "w", encoding="utf-8") as f:
+            f.write(text)
+        print(f"Merge written to {output}")
+    else:
+        print(text)
+
+    return 1 if result.has_conflicts else 0
 
 
 if __name__ == "__main__":
