@@ -2,7 +2,17 @@
 
 A personal file/folder comparison utility for Linux, inspired by Beyond Compare.
 
-**Status:** Prototype. Core features working: side-by-side panes, hash comparison, diff dialog, file operations, settings persistence, session save/load, context menus, drag-and-drop, archive browsing, SFTP remote, CLI mode.
+**Status:** Shipped v0.2.0. Core features working: side-by-side panes, hash comparison, diff dialog, file operations, settings persistence, session save/load, context menus, drag-and-drop, archive browsing, SFTP remote, CLI mode.
+
+**Install:**
+```bash
+pip install synk-diff       # or: pipx install synk-diff
+synk --help
+```
+
+**Source / Issues:** https://github.com/deepak-pradhan/synk
+**PyPI:** https://pypi.org/project/synk-diff/
+**Releases:** https://github.com/deepak-pradhan/synk/releases
 
 ## Quick Start
 
@@ -90,5 +100,5 @@ tests/
 - [x] pytest setup with gui/headless markers
 - [x] Archive support (ZIP, TAR, GZ, BZ2, XZ) — browse inside archives
 - [x] SFTP/remote comparison (browse remote server via SFTP)
-- [ ] CLI for headless diff
-- [ ] CI
+- [x] CLI for headless diff
+- [x] CI (GitHub Actions, publish to PyPI on release tag)
