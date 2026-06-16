@@ -29,9 +29,10 @@ Users need to get Synk onto their machines. Options include PyPI (pip install), 
 
 ## Decision
 
-- **Primary channel:** PyPI (`synk-diff` package).
-- **Secondary channel:** GitHub Releases with automatically-built wheels and source tarballs.
+- **Primary channel:** PyPI (`synk-diff` package), published automatically on release tags via GitHub Actions.
+- **Secondary channel:** GitHub Releases with attached wheels and source tarballs.
 - **No distro-specific packaging** in initial scope.
+- **Integrity:** wheels and tarballs are attached to GitHub Releases; checksums may be added in a future release.
 
 ## Rationale
 
@@ -69,3 +70,25 @@ Users need to get Synk onto their machines. Options include PyPI (pip install), 
 | Flatpak/Snap | Heavy sandboxing overhead for filesystem tool |
 | Distro-native packages (deb/rpm) | High maintenance, low demand |
 | Docker image | Useful for CI but awkward for GUI use |
+
+## Deferred Channels
+
+| Channel | Status | Rationale |
+|---------|--------|-----------|
+| Docker / OCI image | Deferred | Useful for CI-only `synk diff`/`hash` jobs, but GUI use is awkward and increases build complexity. |
+| Flatpak / Snap | Rejected for v0.x | Filesystem tool needs broad host access; sandboxing friction outweighs discoverability benefits. |
+| Distro-native packages (apt/pacman/dnf) | Rejected for v0.x | Per-distro CI, signing keys, and release cadence overhead exceed demand signal. |
+
+## Distribution Metrics
+
+| Metric | Target | How Measured |
+|--------|--------|--------------|
+| PyPI upload success rate | 100% of tagged releases | GitHub Actions logs |
+| GitHub Release artifacts | Wheel + sdist for every tag | Release page checklist |
+| 90-day PyPI downloads | ≥ 100 | `pypistats.org` or PyPI JSON API |
+
+## Related Records
+
+- Enabled by `synk-bdr-0003` (monetization: free removes pricing friction) and `synk-bdr-0004` (open-source licensing: MIT enables redistribution).
+- Depends on `synk-bdr-0002` (audience: developers comfortable with `pipx`).
+- Implemented by ADR-0009 (dual entrypoint) and the release CI workflow.

@@ -59,3 +59,28 @@ Synk is **free of charge, MIT-licensed, and not monetized**.
 | MIT + "Sponsor" button (GitHub Sponsors) | Worth adding if asked, but not actively pursued |
 | Open-core (free core, paid merge/archive) | Over-engineered for single-developer project |
 | Paid license ($10–$20) | Creates support expectations; would net < $500 total |
+
+## Sustainability Threshold
+
+Synk remains free unless the **annual incidental cost** exceeds the following bands:
+
+| Band | Annual Cost | Action |
+|------|-------------|--------|
+| Green | ≤ $50 | Absorb personally; no change. |
+| Yellow | $50–$200 | Enable GitHub Sponsors link and mention it in README; donations optional. |
+| Red | > $200 | Revisit monetization decision in a new BDR; consider accepting sponsorships or adding a paid tier only if support burden can be managed. |
+
+Current incidental costs are limited to PyPI hosting (free) and GitHub Actions free-tier minutes.
+
+## Financial Risk Matrix
+
+| Risk | Likelihood | Impact | Mitigation |
+|------|------------|--------|------------|
+| No revenue, project abandoned | Medium | High | Keep scope small; dogfood daily; document clearly |
+| CI minutes exceed free tier | Low | Low | Move heavy jobs to scheduled runs; cache aggressively |
+| Unexpected paid dependency needed | Low | Medium | Prefer stdlib/MIT dependencies; audit before adding |
+
+## Related Records
+
+- Enabled by `synk-bdr-0001` (build vs buy) and `synk-bdr-0002` (target audience).
+- Enables `synk-bdr-0004` (open-source licensing) and `synk-bdr-0005` (distribution).

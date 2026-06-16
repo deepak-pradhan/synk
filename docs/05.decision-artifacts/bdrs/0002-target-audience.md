@@ -62,3 +62,30 @@ product.
 | Commercial product (paid license) | Creates support burden, tax/compliance overhead, pricing pressure |
 | Enterprise-only (bulk licensing) | Requires sales effort far beyond scope |
 | Donation-ware / open-core | More complexity than value for single-developer project |
+
+## Target Personas
+
+| Persona | Primary Need | Typical Workflow |
+|---------|--------------|------------------|
+| Linux developer | Fast, keyboard-friendly diff/merge | `synk diff dirA/ dirB/` from terminal |
+| CI/automation maintainer | Headless comparison in pipelines | `synk hash` or `synk compare` in GitHub Actions |
+| Backup/server administrator | Verify archive integrity and remote files | Browse `.tar.gz` and compare against SFTP path |
+
+## Explicitly Not the Target Audience
+
+- **Enterprise buyers** needing support SLAs, vendor questionnaires, or dedicated account management.
+- **Windows-only users** without WSL or a cross-platform workflow (Windows support is not a v0.x goal).
+- **Non-technical end users** who need a wizard-driven setup or cannot install Python/Qt6 dependencies.
+
+## Positioning Statement
+
+> For Linux developers and power users who need a free, scriptable, cross-pane diff and merge tool, Synk is a personal utility that combines GUI convenience with headless CLI automation. Unlike Beyond Compare, Synk is MIT-licensed and includes archive/SFTP/3-way merge support; unlike Meld, it is actively maintained and Qt6-based.
+
+## Adoption Success Metric
+
+100+ PyPI downloads in the first 90 days after v0.2.0 release, measured via PyPI stats, with at least one external issue or PR opened by a non-author user.
+
+## Related Records
+
+- Informs `synk-bdr-0001` (build vs buy), `synk-bdr-0003` (monetization), and `synk-bdr-0006` (prioritization).
+- Operationalized by `synk-moscow-0001` (core feature build sequence).

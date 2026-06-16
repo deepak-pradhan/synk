@@ -68,3 +68,45 @@ Features are prioritized using a **pain-driven, dogfood-first** model:
 | SFTP remote | Medium — server migrations quarterly | Should | Built M8 |
 | 3-way merge | Medium — occasional Git conflict resolution | Could | Built v0.2 |
 | Plugin system | None — no concrete pain | Won't | Deferred indefinitely |
+
+## Bug / Security Override
+
+The pain-driven model applies to **features**, not to defects or security issues.
+
+| Category | Rule |
+|----------|------|
+| Critical bug (data loss, crash, wrong comparison result) | Outranks all feature work; fix immediately. |
+| Security issue | Outranks feature work; fix and disclose per `synk-bdr-0004`. |
+| Minor bug with no workaround | Treated as "Should" if it blocks a common workflow; otherwise "Could". |
+| Cosmetic / nice-to-have | Competes with features under the standard pain model. |
+
+## Escalation Path
+
+1. **Personal pain:** author opens issue, tags it, and schedules it.
+2. **External user bug:** triaged within 7 days; if it affects a common workflow, escalated to "Should" or "Must".
+3. **Security issue:** handled privately and fixed out-of-band from the public roadmap.
+
+## Mapping to MoSCoW
+
+This philosophy maps to `synk-moscow-0001` as follows:
+
+| Philosophy Bucket | MoSCoW Bucket |
+|-------------------|---------------|
+| "Does the author need it this week?" | Must |
+| "Does it unblock a common workflow?" | Should |
+| "Does it look cool but solve no real pain?" | Could |
+| "Introduces ongoing maintenance cost" | Won't or deferred until pain justifies it |
+
+## Rejected or Deferred Features Log
+
+| Feature | Pain Level | Decision | Rationale |
+|---------|-----------|----------|-----------|
+| Plugin system | None | Won't | No concrete use case; API surface would become a maintenance burden. |
+| Windows native installer | Low | Won't | Author is not a Windows user; WSL is acceptable for cross-platform users. |
+| Built-in cloud sync / account system | None | Won't | Conflicts with personal-utility positioning and adds privacy risk. |
+
+## Related Records
+
+- Operationalizes `synk-bdr-0002` (target audience: only build what the audience needs).
+- Constrained by `synk-bdr-0003` (monetization: no paid team to build "nice-to-haves").
+- Implemented through `synk-moscow-0001` (core feature build sequence).
