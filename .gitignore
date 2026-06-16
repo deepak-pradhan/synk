@@ -8,3 +8,13 @@ wheels/
 
 # Virtual environments
 .venv
+
+# Coverage and test artifacts
+.coverage
+htmlcov/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Sensitive / local-only files
+docs/PyPI-Recovery-Codes-*
