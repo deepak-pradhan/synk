@@ -55,7 +55,7 @@ Users need to get Synk onto their machines. Options include PyPI (pip install), 
 **Positive:**
 - Single distribution mechanism covers all platforms.
 - `pip install` is the lowest-friction path for developers.
-- CI/CD pipeline is simple: tag → `twine upload` → done.
+- CI/CD pipeline is simple: tag → build wheel + sdist → publish to PyPI via trusted publishing → attach artifacts to GitHub Release.
 
 **Negative:**
 - Requires Python 3.12+ on target system.
