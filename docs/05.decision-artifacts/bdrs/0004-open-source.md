@@ -71,3 +71,30 @@ Synk lives on a public GitHub repo. A license must be chosen, and the open-sourc
 | AGPLv3 | Unnecessary for desktop utility with no network service |
 | Apache 2.0 | Adds patent-retaliation clause; MIT is simpler |
 | No license ("all rights reserved") | Prevents anyone from fixing bugs or packaging for distros |
+
+## Security Response
+
+- **Reporting channel:** Security-sensitive issues should be reported via GitHub private vulnerability report or direct email to the author; public issues for undisclosed vulnerabilities are discouraged.
+- **Acknowledgment:** Reporter will be acknowledged within 7 days; a fix or public disclosure plan will be shared within 30 days for confirmed vulnerabilities.
+- **Disclosure policy:** Coordinated disclosure; details kept private until a patch is released and users have a reasonable upgrade window.
+
+## Contribution Triage SLA
+
+| Item | Target |
+|------|--------|
+| Bug reports triaged and labeled | 7 days |
+| Pull requests reviewed | 14 days |
+| Feature requests | No SLA; evaluated against `synk-bdr-0006` prioritization philosophy |
+| Author's own issues/PRs | Same targets to avoid self-bias |
+
+## Bus Factor & Succession
+
+- Current bus factor is 1 (single maintainer).
+- Mitigation: keep the codebase small and well-documented; use standard Python packaging; store decision artifacts in-repo; publish to PyPI so the package can outlive the repo if necessary.
+- If the author steps away for > 6 months, the README will be updated to mark the project as "maintenance mode" and invite new maintainers.
+
+## Related Records
+
+- Enabled by `synk-bdr-0001` (build vs buy) and `synk-bdr-0003` (monetization).
+- Enables `synk-bdr-0005` (distribution).
+- Governance operates alongside `synk-bdr-0006` (prioritization) when accepting contributions.

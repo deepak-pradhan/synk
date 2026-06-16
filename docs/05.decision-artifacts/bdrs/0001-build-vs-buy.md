@@ -62,3 +62,26 @@ Build Synk from scratch rather than extending or wrapping existing tools.
 | Contribute to Meld | GTK4 migration stalled; roadmap misalignment |
 | VS Code extension | Tied to editor runtime, no headless mode, no archives |
 | Shell script wrapper around `diff -rq` + `sha256sum` | No GUI, no merge, no session save/load |
+
+## Success Metrics
+
+| Metric | Target | How Measured |
+|--------|--------|--------------|
+| Personal weekly usage | ≥ 3 real workflows (config drift, backup verify, merge) | Author log |
+| Headless test coverage for core modules | ≥ 70% for `hasher`, `archive`, `merge`, `remote` parsing | `pytest --cov` |
+| Feature parity with daily Beyond Compare use cases | Side-by-side diff, hash compare, archive browse, SFTP, 3-way merge | Functional checklist |
+| Maintenance burden | ≤ 4 hours/month on Qt/paramiko/bindings | Time tracking |
+
+## Trigger to Revisit
+
+Re-evaluate "build" vs "buy/extend" if any of the following happen:
+
+1. Maintenance burden exceeds 8 hours/month for two consecutive months.
+2. Qt6 or paramiko bindings break across two consecutive Python versions and no clean upgrade path exists.
+3. A comparable open-source tool (e.g., Meld revival, a well-maintained Python diff library) covers all core features under a permissive license.
+4. Author stops using Synk for real work for 90+ days.
+
+## Related Records
+
+- Depends on business context defined in `synk-bdr-0002` (audience).
+- Enabled by `synk-adr-0008` (module separation) and `synk-adr-0010` (three-way merge engine).
