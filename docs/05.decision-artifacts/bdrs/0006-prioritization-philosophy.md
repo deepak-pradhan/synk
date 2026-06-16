@@ -63,10 +63,10 @@ Features are prioritized using a **pain-driven, dogfood-first** model:
 
 | Feature | Pain Level | Priority | Outcome |
 |---------|-----------|----------|---------|
-| Side-by-side file diff | High — daily config drift checks | Must | Built M1–2 |
-| Archive browsing | High — verifying backup tarballs | Must | Built M7 |
-| SFTP remote | Medium — server migrations quarterly | Should | Built M8 |
-| 3-way merge | Medium — occasional Git conflict resolution | Could | Built v0.2 |
+| Side-by-side file diff | High — daily config drift checks | Must | Built by v0.1 |
+| Archive browsing | High — verifying backup tarballs | Must | Built by v0.1.5 |
+| SFTP remote | Medium — server migrations quarterly | Should | Built by v0.1.8 |
+| 3-way merge | Medium — occasional Git conflict resolution | Could | Built in v0.2 |
 | Plugin system | None — no concrete pain | Won't | Deferred indefinitely |
 
 ## Bug / Security Override

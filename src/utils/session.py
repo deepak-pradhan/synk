@@ -1,11 +1,34 @@
 import tomllib
 import tomli_w
-import os
 from pathlib import Path
 from typing import Optional
+from urllib.parse import urlparse, urlunparse
 
 SESSION_DIR = Path.home() / ".config" / "beyondcomp"
 LAST_SESSION_FILE = SESSION_DIR / "last_session.toml"
+
+
+def _sanitize_path(path: str) -> str:
+    """Remove credentials from SFTP URLs before persistence.
+
+    sftp://user:pass@host/path becomes sftp://user@host/path.
+    Non-SFTP paths are returned unchanged.
+    """
+    if not path.startswith("sftp://"):
+        return path
+    parsed = urlparse(path)
+    if parsed.username is None and parsed.password is None:
+        return path
+    # Rebuild without password; keep username if present.
+    netloc = parsed.hostname or ""
+    if parsed.port:
+        netloc = f"{netloc}:{parsed.port}"
+    if parsed.username:
+        netloc = f"{parsed.username}@{netloc}"
+    sanitized = urlunparse(
+        (parsed.scheme, netloc, parsed.path, parsed.params, parsed.query, parsed.fragment)
+    )
+    return sanitized
 
 
 def save_session(file_path: str, data: dict) -> bool:
@@ -27,8 +50,8 @@ def load_session(file_path: str) -> Optional[dict]:
 
 def save_last_session(left_path: str, right_path: str, config: dict) -> bool:
     data = {
-        "left_path": left_path,
-        "right_path": right_path,
+        "left_path": _sanitize_path(left_path),
+        "right_path": _sanitize_path(right_path),
         "hash_algorithm": config.get("comparison", {}).get("hash_algorithm", "xxh3_64"),
         "ignore_patterns": config.get("ignore", {}).get("patterns", []),
         "show_identical": config.get("ignore", {}).get("show_identical", True),

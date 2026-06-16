@@ -32,15 +32,19 @@ contexts, need to know what the tool transmits, stores, or logs.
 
 Synk operates under a **local-first, no-telemetry, no-analytics** policy:
 
-1. **No telemetry, analytics, or crash reporting** is collected or transmitted by the application.
-2. **File contents and paths are processed locally** and are never uploaded to any third-party service.
-3. **SFTP credentials** are held in memory only while a connection is active; they are not written to
-the config file, session files, or logs.
+1. **No telemetry, analytics, or crash reporting** is collected or transmitted by Synk's own code.
+2. **File contents and paths are processed locally** and are never uploaded to any third-party service by Synk.
+3. **SFTP credentials:** passwords and key passphrases are held in memory only while a connection is
+active and are not written to the config file or logs. Session files may store SFTP host, username,
+and private-key **path**, but passwords are stripped before persistence.
 4. **Session and config files** are stored locally on disk; the user is responsible for their host
 security.
 5. **Logs and error output** must not include passwords, key file contents, or full file contents.
-6. **No network calls** are made except explicit user-initiated SFTP/SSH connections and package-manager
-operations (`pip install`) outside the application.
+6. **No network calls** are initiated by Synk application code except explicit user-initiated
+SFTP/SSH connections. Qt or the host platform may make incidental network requests (e.g., theme
+lookups), which are outside Synk's control.
+7. **CLI output** (diffs, paths, hashes) is written to stdout/stderr; users are responsible for
+where that output is piped, logged, or stored.
 
 ## Rationale
 
@@ -80,7 +84,7 @@ operations (`pip install`) outside the application.
 | Local file contents | Memory only | No | Hashed or diffed locally |
 | Local file/directory paths | Memory, session TOML | No | User controls session file location |
 | SFTP host/username | Memory, optionally session TOML | No | Password stripped before persistence |
-| SFTP password / key passphrase | Memory only | No | Never persisted or logged |
+| SFTP password / key passphrase | Memory only | No | Stripped from URLs before session persistence; never logged |
 | SFTP private key path | Memory, session TOML | No | Path only; key file never read by Synk for logging |
 | Hash values | Memory only | No | Used for comparison |
 | Config preferences (theme, hash algo, ignore patterns) | `~/.config/beyondcomp/config.toml` | No | Local only |

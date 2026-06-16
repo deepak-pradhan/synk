@@ -85,6 +85,12 @@ product.
 
 100+ PyPI downloads in the first 90 days after v0.2.0 release, measured via PyPI stats, with at least one external issue or PR opened by a non-author user.
 
+## If the Metric Is Missed
+
+No change to positioning or distribution. Synk remains a personal utility, and the author continues
+to dogfood it. The metric is a signal, not a threshold for abandonment. A follow-up BDR would only be
+opened if external adoption collapses *and* the author stops using the tool personally.
+
 ## Related Records
 
 - Informs `synk-bdr-0001` (build vs buy), `synk-bdr-0003` (monetization), and `synk-bdr-0006` (prioritization).

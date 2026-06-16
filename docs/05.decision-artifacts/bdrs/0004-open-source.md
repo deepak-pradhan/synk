@@ -49,7 +49,11 @@ Synk lives on a public GitHub repo. A license must be chosen, and the open-sourc
 ### Why no CLA
 - CLAs create friction for casual contributors. Risk of patent-ambush or copyright dispute is
   negligible for a project this scale.
-- DCO (Developer Certificate of Origin) via `git commit -s` is sufficient.
+
+### Sign-off / DCO
+- No formal Developer Certificate of Origin (DCO) requirement is currently enforced.
+- Contributors grant rights implicitly by submitting a PR under the MIT license.
+- If the project later needs signed commits, a DCO check will be added to CI and documented here.
 
 ## Consequences
 

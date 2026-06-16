@@ -6,7 +6,7 @@ lifecycle_state:  "approved"
 priority:         "medium"
 confidentiality:  "internal"
 owner:            "Deepak"
-version:          "1.0"
+version:          "1.1"
 last_updated:     "2026-06-16"
 next_review_date: "2026-09-16"
 relations:
@@ -49,6 +49,10 @@ or config schema change risks surprising users or breaking automation.
   and release notes.
 - **LTS / support windows:** No long-term support lines. Only the latest release is actively
   maintained.
+- **Release quality gate:** A release tag is only pushed when:
+  - Headless tests pass (`uv run pytest -m "not gui"`).
+  - The wheel and sdist build successfully (`uv build`).
+  - GUI tests are informational and not a release blocker because they require a display.
 
 ## Rationale
 
@@ -58,6 +62,7 @@ or config schema change risks surprising users or breaking automation.
   would be over-engineering at this stage.
 - Dependency minimum bumps for security are treated as patches or minors because they do not change
   Synk's own public API.
+- The release quality gate prevents broken artifacts from reaching PyPI without adding heavy process.
 
 ## Consequences
 
@@ -65,6 +70,7 @@ or config schema change risks surprising users or breaking automation.
 - Users can pin `synk-diff~=0.2` and expect non-breaking additions.
 - Release notes communicate risk clearly.
 - Low maintenance overhead.
+- Releases are gated by automated checks.
 
 **Negative:**
 - No LTS means users who cannot upgrade frequently may be stranded on an unmaintained version.
