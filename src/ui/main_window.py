@@ -32,7 +32,7 @@ import shutil
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Beyond Compare Lite")
+        self.setWindowTitle("Synk")
         self.resize(1200, 700)
         self._config = load_config()
         algo = self._config["comparison"]["hash_algorithm"]
@@ -265,7 +265,7 @@ class MainWindow(QMainWindow):
         left_path = self.left_pane.get_current_path() or ""
         right_path = self.right_pane.get_current_path() or ""
         file_path, _ = QFileDialog.getSaveFileName(
-            self, "Save Session", "", "Beyond Compare Session (*.bc-session)"
+            self, "Save Session", "", "Synk Session (*.bc-session)"
         )
         if not file_path:
             return
@@ -284,7 +284,7 @@ class MainWindow(QMainWindow):
     @Slot()
     def load_session(self):
         file_path, _ = QFileDialog.getOpenFileName(
-            self, "Load Session", "", "Beyond Compare Session (*.bc-session)"
+            self, "Load Session", "", "Synk Session (*.bc-session)"
         )
         if not file_path:
             return
