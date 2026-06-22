@@ -89,6 +89,7 @@ class CompareWorker(QRunnable):
     def _scan_directory(self, path: str) -> Dict[str, dict]:
         """
         Scan a directory and return a dict mapping item name to a dict with:
+            - 'name': str (the entry name; used to rebuild paths in compare)
             - 'is_dir': bool
             - 'size': int (for files)
             - 'mtime': float (modification time)
@@ -104,6 +105,7 @@ class CompareWorker(QRunnable):
                         continue
                     info = entry.stat()
                     items[entry.name] = {
+                        "name": entry.name,
                         "is_dir": entry.is_dir(),
                         "size": info.st_size,
                         "mtime": info.st_mtime,
