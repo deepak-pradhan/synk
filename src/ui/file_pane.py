@@ -12,10 +12,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import (
     Qt,
     Signal,
-    Slot,
-    QDir,
     QFileInfo,
-    QModelIndex,
     QMimeData,
     QByteArray,
 )
@@ -27,9 +24,8 @@ from PySide6.QtGui import (
     QDrag,
 )
 import os
-from pathlib import Path
-from src.core.archive import is_archive, list_archive_at_depth, extract_file
-from src.core.remote import SFTPConnection, SFTPCredentials, parse_sftp_url, get_remote_path
+from src.core.archive import is_archive
+from src.core.remote import SFTPConnection, parse_sftp_url, get_remote_path
 
 MIME_TYPE = "application/x-beyondcomp-filepaths"
 ARCHIVE_PREFIX = "archive:"
@@ -156,7 +152,6 @@ class FilePane(QWidget):
         if not path:
             return
         if path.startswith(SFTP_PREFIX):
-            from src.ui.sftp_connect_dialog import SFTPConnectDialog
             creds = parse_sftp_url(path)
             remote_path = get_remote_path(path)
             conn = SFTPConnection(creds)

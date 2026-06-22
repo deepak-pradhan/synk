@@ -2,8 +2,6 @@ from PySide6.QtWidgets import (
     QMainWindow,
     QWidget,
     QVBoxLayout,
-    QHBoxLayout,
-    QPushButton,
     QLabel,
     QStatusBar,
     QToolBar,
@@ -11,12 +9,10 @@ from PySide6.QtWidgets import (
     QFileDialog,
     QInputDialog,
     QMessageBox,
-    QApplication,
 )
 from PySide6.QtCore import Qt, Slot, QThreadPool, QUrl
 from PySide6.QtGui import (
     QAction,
-    QIcon,
     QBrush,
     QColor,
     QStandardItem,
@@ -24,11 +20,11 @@ from PySide6.QtGui import (
 )
 from src.ui.file_pane import FilePane
 from src.ui.diff_dialog import DiffDialog
-from src.core.worker import CompareWorker, WorkerSignals
+from src.core.worker import CompareWorker
 from src.core.hasher import Hasher
 from src.ui.settings_dialog import SettingsDialog
 from src.utils.config import load_config, save_config
-from src.utils.session import save_session, load_session, save_last_session, load_last_session, clear_last_session
+from src.utils.session import save_session, load_session, save_last_session, load_last_session
 import os
 import shutil
 

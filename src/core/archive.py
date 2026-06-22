@@ -1,7 +1,6 @@
 import zipfile
 import tarfile
 import os
-import tempfile
 from dataclasses import dataclass
 from typing import Optional
 
@@ -158,10 +157,8 @@ def list_archive_at_depth(path: str, prefix: str = "") -> list[ArchiveEntry]:
 
         if "/" in remainder:
             is_dir = True
-            display_name = top
         else:
             is_dir = entry.is_dir
-            display_name = remainder
 
         result.append(ArchiveEntry(
             name=key,

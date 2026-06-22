@@ -6,8 +6,6 @@ from PySide6.QtWidgets import (
     QTextEdit,
     QPushButton,
     QSplitter,
-    QApplication,
-    QMessageBox,
 )
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QFont, QTextCharFormat, QColor, QTextCursor
@@ -34,7 +32,7 @@ class MergeDialog(QDialog):
         self.local_label = local_label
         self.remote_label = remote_label
 
-        self.result = None  # filled on accept
+        self.result_text = None  # filled on accept (avoids shadowing QDialog.result())
         self.setup_ui()
         self.run_merge()
 
@@ -265,8 +263,8 @@ class MergeDialog(QDialog):
             self.accept_btn.setEnabled(True)
 
     def _on_accept(self):
-        self.result = self.merged_edit.toPlainText()
+        self.result_text = self.merged_edit.toPlainText()
         self.accept()
 
     def get_result(self):
-        return self.result
+        return self.result_text

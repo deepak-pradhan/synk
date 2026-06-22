@@ -177,17 +177,17 @@ def do_merge(base_path: str, local_path: str, remote_path: str, output: str | No
     if use_gui:
         from PySide6.QtWidgets import QApplication
         from src.ui.merge_dialog import MergeDialog
-        app = QApplication.instance() or QApplication(sys.argv)
+        app = QApplication.instance() or QApplication(sys.argv)  # noqa: F841  (held to own the QApplication lifetime)
         dialog = MergeDialog(base_text, local_text, remote_text,
                              base_label=base_path, local_label=local_path, remote_label=remote_path)
         dialog.exec()
-        if dialog.result is not None:
+        if dialog.result_text is not None:
             if output:
                 with open(output, "w", encoding="utf-8") as f:
-                    f.write(dialog.result)
+                    f.write(dialog.result_text)
                 print(f"Merge written to {output}")
             else:
-                print(dialog.result)
+                print(dialog.result_text)
             return 0
         return 1
 

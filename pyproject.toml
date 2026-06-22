@@ -29,6 +29,9 @@ Repository = "https://github.com/deepak-pradhan/synk"
 [dependency-groups]
 dev = [
     "pytest>=8.0",
+    "mypy>=1.11",
+    "ruff>=0.6",
+    "types-paramiko>=3.5",
 ]
 
 [tool.pytest.ini_options]
@@ -37,3 +40,17 @@ pythonpath = ["."]
 markers = [
     "gui: tests requiring a display (X11/Wayland) — skipped headless",
 ]
+
+[tool.ruff]
+target-version = "py312"
+# Default rule set (Pyflakes `F` + pycodestyle `E`). Kept intentionally minimal;
+# expand in a follow-up rather than bulk-fixing here.
+
+[tool.mypy]
+python_version = "3.12"
+files = ["src"]
+
+# diff-match-patch ships no type stubs and has no types-* package.
+[[tool.mypy.overrides]]
+module = ["diff_match_patch.*"]
+ignore_missing_imports = true
