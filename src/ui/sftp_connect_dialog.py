@@ -1,3 +1,5 @@
+from typing import Optional
+
 from PySide6.QtWidgets import (
     QDialog,
     QVBoxLayout,
@@ -6,10 +8,8 @@ from PySide6.QtWidgets import (
     QSpinBox,
     QPushButton,
     QHBoxLayout,
-    QCheckBox,
     QLabel,
 )
-from PySide6.QtCore import Qt
 from src.core.remote import SFTPCredentials
 
 
@@ -105,7 +105,7 @@ class SFTPConnectDialog(QDialog):
         self._remote_path = self.path_edit.text().strip() or "/"
         self.accept()
 
-    def get_credentials(self) -> SFTPCredentials:
+    def get_credentials(self) -> Optional[SFTPCredentials]:
         return self._creds
 
     def get_remote_path(self) -> str:

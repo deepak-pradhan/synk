@@ -1,15 +1,13 @@
 from PySide6.QtWidgets import (
     QDialog,
     QVBoxLayout,
-    QHBoxLayout,
     QLabel,
     QTextEdit,
     QPushButton,
     QHBoxLayout,
     QApplication,
 )
-from PySide6.QtCore import Qt
-from PySide6.QtGui import QFont, QTextCharFormat, QColor, QTextCursor
+from PySide6.QtGui import QFont, QTextCharFormat, QColor
 from diff_match_patch import diff_match_patch
 import os
 

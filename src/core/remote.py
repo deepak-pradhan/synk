@@ -1,6 +1,6 @@
 import paramiko
 import os
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Optional
 from urllib.parse import urlparse
 
@@ -50,7 +50,10 @@ class SFTPConnection:
 
     @property
     def connected(self) -> bool:
-        return self._client is not None and self._client.get_transport() is not None and self._client.get_transport().is_active()
+        if self._client is None:
+            return False
+        transport = self._client.get_transport()
+        return transport is not None and transport.is_active()
 
     def connect(self) -> str:
         """Connect to the remote server. Returns an error string or empty string on success."""
@@ -58,7 +61,7 @@ class SFTPConnection:
             self._client = paramiko.SSHClient()
             self._client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 
-            kwargs = {
+            kwargs: dict[str, object] = {
                 "hostname": self.creds.host,
                 "port": self.creds.port,
                 "username": self.creds.username,
@@ -72,7 +75,9 @@ class SFTPConnection:
                 kwargs["allow_agent"] = True
                 kwargs["look_for_keys"] = True
 
-            self._client.connect(**kwargs)
+            # kwargs assembled dynamically (key vs password vs agent auth); paramiko's
+            # connect() is too strictly typed for a **dict splat.
+            self._client.connect(**kwargs)  # type: ignore[arg-type]
             self._sftp = self._client.open_sftp()
             return ""
         except Exception as e:
@@ -103,9 +108,9 @@ class SFTPConnection:
             for attr in self._sftp.listdir_attr(remote_path):
                 entries.append(RemoteEntry(
                     name=attr.filename,
-                    size=attr.st_size if not attr.st_mode & 0o40000 else 0,
+                    size=(attr.st_size or 0) if not ((attr.st_mode or 0) & 0o40000) else 0,
                     mtime=attr.st_mtime if attr.st_mtime else 0.0,
-                    is_dir=bool(attr.st_mode & 0o40000),
+                    is_dir=bool((attr.st_mode or 0) & 0o40000),
                     path=remote_path.rstrip("/") + "/" + attr.filename,
                 ))
         except Exception:
@@ -120,9 +125,9 @@ class SFTPConnection:
             attr = self._sftp.stat(remote_path)
             return RemoteEntry(
                 name=os.path.basename(remote_path),
-                size=attr.st_size,
+                size=attr.st_size or 0,
                 mtime=attr.st_mtime if attr.st_mtime else 0.0,
-                is_dir=bool(attr.st_mode & 0o40000),
+                is_dir=bool((attr.st_mode or 0) & 0o40000),
                 path=remote_path,
             )
         except Exception:

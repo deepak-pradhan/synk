@@ -2,7 +2,6 @@ from PySide6.QtCore import QRunnable, QObject, Signal, Slot
 from ..core.hasher import Hasher, quick_compare
 import os
 import fnmatch
-from pathlib import Path
 from typing import Optional, Tuple, Dict, List
 
 
@@ -144,23 +143,7 @@ class CompareWorker(QRunnable):
                     # Quick size check
                     if info["size"] != other_info["size"]:
                         return ("different", "#FFA07A")  # Light salmon
-                    # Size is same, check hash
-                    # We need to compute the hash for both files
-                    left_path = (
-                        os.path.join(self.left_path, info["name"])
-                        if is_left
-                        else os.path.join(self.right_path, info["name"])
-                    )
-                    right_path = (
-                        os.path.join(self.left_path, other_info["name"])
-                        if not is_left
-                        else os.path.join(self.right_path, other_info["name"])
-                    )
-                    # Actually, we have the info dicts but not the full path. We need to reconstruct.
-                    # Let's change the _scan_directory to also store the full path? Or we can pass the base path.
-                    # We'll change the method to return the full path as well.
-                    # For now, let's recompute the path.
-                    # We have the base paths: self.left_path and self.right_path
+                    # Size is same — recompute full paths and compare by hash
                     if is_left:
                         left_file = os.path.join(self.left_path, info["name"])
                         right_file = os.path.join(self.right_path, other_info["name"])

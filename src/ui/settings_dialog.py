@@ -12,8 +12,7 @@ from PySide6.QtWidgets import (
     QPushButton,
     QLabel,
 )
-from PySide6.QtCore import Qt
-from src.utils.config import load_config, save_config, DEFAULT_CONFIG
+from src.utils.config import load_config, save_config
 
 HASH_ALGORITHMS = ["xxh3_64", "xxh64", "md5", "sha1", "sha256"]
 THEMES = ["light", "dark"]

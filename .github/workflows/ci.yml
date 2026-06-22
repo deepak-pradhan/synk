@@ -21,9 +21,11 @@ jobs:
           python-version: "3.12"
       - name: Install dependencies
         run: uv sync --group dev
+      - name: Lint (ruff)
+        run: uv run ruff check src/
+      - name: Typecheck (mypy)
+        run: uv run mypy src/
       - name: Run tests (headless)
         run: uv run pytest tests/ -v -m "not gui"
-      - name: Typecheck
-        run: uv run mypy src/ || true
       - name: Build wheel
         run: uv build

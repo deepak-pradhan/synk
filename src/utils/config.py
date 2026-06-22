@@ -1,8 +1,6 @@
 import tomllib
 import tomli_w
-import os
 from pathlib import Path
-from typing import Optional
 
 CONFIG_DIR = Path.home() / ".config" / "beyondcomp"
 CONFIG_FILE = CONFIG_DIR / "config.toml"
